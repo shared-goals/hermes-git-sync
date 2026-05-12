@@ -33,6 +33,7 @@ symlink "$REPO/config.yaml"          "$HERMES/config.yaml"
 symlink "$REPO/SOUL.md"              "$HERMES/SOUL.md"
 symlink "$REPO/memories/MEMORY.md"   "$HERMES/memories/MEMORY.md"
 symlink "$REPO/memories/USER.md"     "$HERMES/memories/USER.md"
+symlink "$REPO/Makefile"             "$HOME/Makefile"
 
 # ── Copy current config files if not yet in repo ─────────────────────────────
 echo "→ Copying current hermes files to repo..."

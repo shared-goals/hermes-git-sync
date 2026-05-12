@@ -28,6 +28,8 @@ git remote set-url origin <your-repo-url>
 
 ## Usage
 
+The `make` targets work from anywhere because `setup-my-hermes.sh` creates a symlink `~/Makefile → ~/my-hermes/Makefile`. Hermes Agent's terminal runs with `~` as the working directory, so `make git-sync` resolves correctly without `cd`.
+
 ```bash
 make git-sync        # sync, commit, push
 make git-sync-dry    # preview changes without committing
