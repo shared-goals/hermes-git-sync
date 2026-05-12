@@ -72,6 +72,18 @@ for other routines (morning-brief, summary crons, etc.).
 `sync-my-skills.py` reads `.bundled_manifest` (MD5 hashes) to detect modifications.  
 No `external_dirs` needed — custom skills live directly in `~/.hermes/skills/`.
 
+## Community skill
+
+Published at: https://github.com/shared-goals/hermes-git-sync
+
+Users can install via tap:
+```bash
+hermes skills tap add shared-goals/hermes-git-sync
+hermes skills install hermes-git-sync
+```
+
+When publishing a skill publicly: use a dedicated public repo per skill (KISS/YAGNI — not a monorepo of skills). Repo name = skill name. Org: `shared-goals/`.
+
 ## Critical rules
 
 - **Always show `git diff --stat` and wait for explicit confirmation before committing** — never commit silently. This applies to ALL paths: running the sync script, direct `git commit` via terminal, Makefile targets, or any other mechanism. There is no exception for "small" changes. `make git-sync-dry` exists specifically to create a technical barrier — use it before `make git-sync`. This rule was violated multiple times in one session; the `--dry-run` flag was added as a structural fix.
@@ -85,4 +97,5 @@ No `external_dirs` needed — custom skills live directly in `~/.hermes/skills/`
 - **Python version** — `hermes-git-sync.sh` auto-detects the hermes venv python (`~/.hermes/hermes-agent/venv/bin/python3`, currently 3.11) and falls back to system `python3` only if the venv is missing.
 - **Cron fires at wrong time** — hermes cron schedules use **local system time** (not UTC). `0 8 * * *` fires at 8am local. Verify with `hermes cron list` — check `Next run` timestamp with timezone offset. A schedule `0 4 * * *` on UTC+4 fires at 4am Samara, not 8am.
 - **git remote still shows old name after repo rename** — `git remote -v` may still point to `shag-hermes.git`; update with `git remote set-url origin <new-url>`.
+- **`make` targets fail without ~/Makefile symlink** — Hermes Agent's terminal runs with `~` as cwd. `make git-sync` only resolves if `~/Makefile` exists. `setup-my-hermes.sh` creates `~/Makefile → ~/my-hermes/Makefile` automatically. If the symlink is missing: `ln -s ~/my-hermes/Makefile ~/Makefile`.
 - **grep false positive in secrets check** — scope grep to data files: `git diff -- memories/ config.yaml | grep -qE '^\+[^+].*(secret|password|api_key)'`.
