@@ -9,7 +9,7 @@ A [Hermes Agent](https://hermes-agent.nousresearch.com) skill that version-contr
 - Commits and pushes daily (integrates with `morning-brief` cron)
 - Handles deletions — skills that revert to bundled state are removed from the mirror
 
-This solves the problem of `~/.hermes/skills/` being unversioned: no history, no rollback, no diff. Instead of making the hermes directory itself a git repo (which conflicts with `hermes update`), we sync only your changes to a separate repo.
+This solves the problem described in [NousResearch/hermes-agent#20352](https://github.com/NousResearch/hermes-agent/issues/20352): `~/.hermes/skills/` is unversioned — no history, no rollback, no diff. Instead of making the hermes directory itself a git repo (which conflicts with `hermes update`), we sync only your changes to a separate repo.
 
 ## Install
 
