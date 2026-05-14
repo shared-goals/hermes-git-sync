@@ -86,8 +86,6 @@ When publishing a skill publicly: use a dedicated public repo per skill (KISS/YA
 
 **Related skills worth publishing together:** `hermes-update-workflow` (`shared-goals/hermes-update-workflow`) — cross-link both READMEs with "works well with". The template Makefile covers both: `update` and `check-update` targets call `hermes-update-workflow` scripts.
 
-**Related skills worth publishing together:** `hermes-update-workflow` (`shared-goals/hermes-update-workflow`) — cross-link both READMEs with "works well with". The template Makefile covers both: `update` and `check-update` targets call `hermes-update-workflow` scripts.
-
 ## Critical rules
 
 - **Always show `git diff --stat` and wait for explicit confirmation before committing** — never commit silently. This applies to ALL paths: running the sync script, direct `git commit` via terminal, Makefile targets, or any other mechanism. There is no exception for "small" changes. `make git-sync-dry` exists specifically to create a technical barrier — use it before `make git-sync`. This rule was violated multiple times in one session; the `--dry-run` flag was added as a structural fix.
@@ -130,4 +128,12 @@ The template `Makefile` (in `templates/`) is the public/generic version — **no
 - **git remote still shows old name after repo rename** — `git remote -v` may still point to `shag-hermes.git`; update with `git remote set-url origin <new-url>`.
 - **`make` targets fail without ~/Makefile symlink** — Hermes Agent's terminal runs with `~` as cwd. `make git-sync` only resolves if `~/Makefile` exists. `setup-my-hermes.sh` creates `~/Makefile → ~/my-hermes/Makefile` automatically. If the symlink is missing: `ln -s ~/my-hermes/Makefile ~/Makefile`.
 - **Template Makefile drifts from the real Makefile** — `templates/Makefile` is copied once during `setup-my-hermes.sh` and never auto-updated. When you add new targets to `~/my-hermes/Makefile` (e.g. `update`, `check-update`, `dashboard`, `install`), update `templates/Makefile` in the skill too. Run `diff ~/my-hermes/Makefile ~/.hermes/skills/devops/hermes-git-sync/templates/Makefile` periodically to catch drift. The template should contain all shared targets **except** user-specific ones (e.g. `voice-memos` with hardcoded usernames).
+- **Published skill repos in `my-skills/` don't have `.git`** — `my-skills/devops/<skill-name>/` is a plain directory (snapshot), not a git clone. If you want to `git push` changes directly from there, you need to initialize `.git` manually by moving it from a fresh clone:
+  ```bash
+  git clone https://github.com/shared-goals/<skill-name>.git /tmp/<skill-name>-tmp
+  mv /tmp/<skill-name>-tmp/.git ~/my-hermes/my-skills/devops/<skill-name>/.git
+  cd ~/my-hermes/my-skills/devops/<skill-name>
+  git status   # should show modified files
+  ```
+  After this, the skill directory behaves as a normal git repo — `git diff`, `git push`, etc. work directly.
 - **grep false positive in secrets check** — scope grep to data files: `git diff -- memories/ config.yaml | grep -qE '^\+[^+].*(secret|password|api_key)'`.
