@@ -82,7 +82,9 @@ hermes skills tap add shared-goals/hermes-git-sync
 hermes skills install hermes-git-sync
 ```
 
-When publishing a skill publicly: use a dedicated public repo per skill (KISS/YAGNI — not a monorepo of skills). Repo name = skill name. Org: `shared-goals/`.
+When publishing a skill publicly: use a dedicated public repo per skill (KISS/YAGNI — not a monorepo of skills). Repo name = skill name. Org: `shared-goals/`. Cross-reference related skills via "Works well with" in README — don't merge them. Use SSH remote (`git@github.com:...`) for push, HTTPS fails in terminal without interactive auth.
+
+**Related skills worth publishing together:** `hermes-update-workflow` (`shared-goals/hermes-update-workflow`) — cross-link both READMEs with "works well with". The template Makefile covers both: `update` and `check-update` targets call `hermes-update-workflow` scripts.
 
 **Related skills worth publishing together:** `hermes-update-workflow` (`shared-goals/hermes-update-workflow`) — cross-link both READMEs with "works well with". The template Makefile covers both: `update` and `check-update` targets call `hermes-update-workflow` scripts.
 
