@@ -1,32 +1,43 @@
-SKILL_DIR := $(shell python3 -c "import subprocess,json; skills=json.loads(subprocess.check_output(['hermes','skills','--json']).decode()); s=[x for x in skills if x['name']=='hermes-git-sync']; print(s[0]['path'] if s else '')")
-SCRIPTS    := $(SKILL_DIR)/scripts
+.PHONY: help git-sync git-sync-dry skills-sync patch install update check-update dashboard
 
-# ── Sync skills + commit + push ───────────────────────────────────────────────
-.PHONY: git-sync git-sync-dry skills-sync
-git-sync:
-	MY_HERMES_REPO=$(CURDIR) bash $(SCRIPTS)/hermes-git-sync.sh
+SHELL := /bin/bash
+
+HERMES_DIR        := $(HOME)/my-hermes
+GIT_SYNC_SCRIPTS  := $(HOME)/.hermes/skills/devops/hermes-git-sync/scripts
+UPDATE_SCRIPTS    := $(HOME)/.hermes/skills/devops/hermes-update-workflow/scripts
+
+# ── Hermes ────────────────────────────────────────────────────────────────────
+
+help: ## Show this help
+	@awk 'BEGIN {FS=":.*##"; printf "\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  make %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+git-sync: ## Sync Hermes config, memories and skills to git
+	@MY_HERMES_REPO=$(HERMES_DIR) bash $(GIT_SYNC_SCRIPTS)/hermes-git-sync.sh
+
+skills-sync: ## Sync my-skills snapshot only (no commit) — use to see changes in IDE
+	@MY_HERMES_REPO=$(HERMES_DIR) bash $(GIT_SYNC_SCRIPTS)/hermes-git-sync.sh --sync-only
 
 git-sync-dry: ## Show what would be committed (no commit)
-	MY_HERMES_REPO=$(CURDIR) bash $(SCRIPTS)/hermes-git-sync.sh --dry-run
+	@MY_HERMES_REPO=$(HERMES_DIR) bash $(GIT_SYNC_SCRIPTS)/hermes-git-sync.sh --dry-run
 
-skills-sync: ## Sync my-skills snapshot only (no commit) — inspect changes in IDE
-	MY_HERMES_REPO=$(CURDIR) bash $(SCRIPTS)/hermes-git-sync.sh --sync-only
+patch: ## Re-apply patches after hermes update
+	@MY_HERMES_REPO=$(HERMES_DIR) bash $(UPDATE_SCRIPTS)/apply-patches.sh
 
-# ── Re-apply patches after hermes update ─────────────────────────────────────
-.PHONY: patch
-patch:
-	bash $(SCRIPTS)/apply-patches.sh
+update: ## Safe update — check releases, PR statuses, confirm, update, re-apply patches
+	@MY_HERMES_REPO=$(HERMES_DIR) bash $(UPDATE_SCRIPTS)/hermes-update.sh
 
-# ── Show patch + PR status ────────────────────────────────────────────────────
-.PHONY: check-update
-check-update:
-	hermes --version
-	@echo ""
-	@echo "Patch registry:"
-	@cat patches/registry.yaml | grep -E 'file:|status:|pr:' | paste - - -
+check-update: ## Check for new releases and patch PR statuses (no changes)
+	@MY_HERMES_REPO=$(HERMES_DIR) bash $(UPDATE_SCRIPTS)/hermes-update.sh --check
 
-# ── Safe hermes update ────────────────────────────────────────────────────────
-.PHONY: update
-update: check-update
-	@echo ""
-	@read -p "Proceed with hermes update? [y/N] " ans && [ "$$ans" = "y" ] && hermes update || echo "Aborted."
+install: ## Bootstrap my-hermes on a new machine (symlinks, cron)
+	@bash $(GIT_SYNC_SCRIPTS)/setup-my-hermes.sh $(HERMES_DIR)
+
+dashboard: ## Start Hermes dashboard on default port 9119 (checks for conflicts first)
+	@PID=$$(lsof -nP -iTCP:9119 -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $$2}'); \
+	if [ -n "$$PID" ]; then \
+		echo "⚠️  Port 9119 is in use by PID $$PID:"; \
+		ps -p $$PID -o pid,command 2>/dev/null | tail -1; \
+		echo "Kill it first: kill $$PID"; \
+		exit 1; \
+	fi
+	hermes dashboard --host 0.0.0.0 --insecure --no-open

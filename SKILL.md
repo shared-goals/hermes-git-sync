@@ -84,13 +84,42 @@ hermes skills install hermes-git-sync
 
 When publishing a skill publicly: use a dedicated public repo per skill (KISS/YAGNI — not a monorepo of skills). Repo name = skill name. Org: `shared-goals/`.
 
+**Related skills worth publishing together:** `hermes-update-workflow` (`shared-goals/hermes-update-workflow`) — cross-link both READMEs with "works well with". The template Makefile covers both: `update` and `check-update` targets call `hermes-update-workflow` scripts.
+
 ## Critical rules
 
 - **Always show `git diff --stat` and wait for explicit confirmation before committing** — never commit silently. This applies to ALL paths: running the sync script, direct `git commit` via terminal, Makefile targets, or any other mechanism. There is no exception for "small" changes. `make git-sync-dry` exists specifically to create a technical barrier — use it before `make git-sync`. This rule was violated multiple times in one session; the `--dry-run` flag was added as a structural fix.
 - **Never commit secrets** — script checks for sensitive patterns in `memories/` and `config.yaml`.
 
+## Script ownership principle
+
+Scripts belong in skills, not in `~/my-hermes/scripts/`. The Makefile calls scripts via skill paths:
+
+```makefile
+GIT_SYNC_SCRIPTS := $(HOME)/.hermes/skills/devops/hermes-git-sync/scripts
+UPDATE_SCRIPTS   := $(HOME)/.hermes/skills/devops/hermes-update-workflow/scripts
+```
+
+`~/my-hermes/scripts/` is legacy — if it exists, delete it. `apply-patches.sh` lives in `hermes-update-workflow`, `setup-my-hermes.sh` lives here. KISS/DRY.
+
+The template `Makefile` (in `templates/`) is the public/generic version — **no user-specific targets** (e.g. `voice-memos`). The user's real `~/my-hermes/Makefile` extends it with machine-specific targets. When updating the template, copy it to `~/my-hermes/Makefile` and re-add any user-specific targets manually — do NOT blindly overwrite.
+
 ## Pitfalls
 
+- **`hermes skills reset` removes from manifest** — `hermes skills reset <name>` clears the manifest entry, so `sync-my-skills.py` treats the skill as user-created (no `bundled.diff`, always copied). Fix: after reverting a skill to bundled state, re-add its hash manually:
+  ```python
+  import hashlib
+  from pathlib import Path
+  skill_dir = Path.home() / ".hermes/hermes-agent/skills/<category>/<name>"
+  hasher = hashlib.md5()
+  for fpath in sorted(skill_dir.rglob("*")):
+      if fpath.is_file():
+          rel = fpath.relative_to(skill_dir)
+          hasher.update(str(rel).encode()); hasher.update(fpath.read_bytes())
+  manifest = Path.home() / ".hermes/skills/.bundled_manifest"
+  with open(manifest, "a") as f: f.write(f"<name>: {hasher.hexdigest()}\n")
+  ```
+  Then run `make skills-sync` — skill should appear as `− removed` from my-skills.
 - **Curator duplication** — Curator can create bundled skill copies in `~/.hermes/skills/` that appear as "user-created". Detect with `make sync-skills` and look for unexpected names. Delete dupes before committing.
 - **Script portability** — use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"` at the top of any script that calls sibling scripts. Hardcoded paths break when the skill moves or is cloned. Both `hermes-git-sync.sh` and `setup-my-hermes.sh` use this pattern.
 - **MY_HERMES_REPO env var** — scripts use `MY_HERMES_REPO` (default: `~/my-hermes`). Set it if your repo lives elsewhere.
@@ -98,4 +127,5 @@ When publishing a skill publicly: use a dedicated public repo per skill (KISS/YA
 - **Cron fires at wrong time** — hermes cron schedules use **local system time** (not UTC). `0 8 * * *` fires at 8am local. Verify with `hermes cron list` — check `Next run` timestamp with timezone offset. A schedule `0 4 * * *` on UTC+4 fires at 4am Samara, not 8am.
 - **git remote still shows old name after repo rename** — `git remote -v` may still point to `shag-hermes.git`; update with `git remote set-url origin <new-url>`.
 - **`make` targets fail without ~/Makefile symlink** — Hermes Agent's terminal runs with `~` as cwd. `make git-sync` only resolves if `~/Makefile` exists. `setup-my-hermes.sh` creates `~/Makefile → ~/my-hermes/Makefile` automatically. If the symlink is missing: `ln -s ~/my-hermes/Makefile ~/Makefile`.
+- **Template Makefile drifts from the real Makefile** — `templates/Makefile` is copied once during `setup-my-hermes.sh` and never auto-updated. When you add new targets to `~/my-hermes/Makefile` (e.g. `update`, `check-update`, `dashboard`, `install`), update `templates/Makefile` in the skill too. Run `diff ~/my-hermes/Makefile ~/.hermes/skills/devops/hermes-git-sync/templates/Makefile` periodically to catch drift. The template should contain all shared targets **except** user-specific ones (e.g. `voice-memos` with hardcoded usernames).
 - **grep false positive in secrets check** — scope grep to data files: `git diff -- memories/ config.yaml | grep -qE '^\+[^+].*(secret|password|api_key)'`.
