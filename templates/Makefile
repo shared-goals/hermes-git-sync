@@ -1,4 +1,4 @@
-.PHONY: help git-sync git-sync-dry skills-sync patch install update check-update dashboard
+.PHONY: help git-sync git-sync-dry skills-sync patch install-my-hermes update update-check dashboard
 
 SHELL := /bin/bash
 
@@ -26,10 +26,10 @@ patch: ## Re-apply patches after hermes update
 update: ## Safe update — check releases, PR statuses, confirm, update, re-apply patches
 	@MY_HERMES_REPO=$(HERMES_DIR) bash $(UPDATE_SCRIPTS)/hermes-update.sh
 
-check-update: ## Check for new releases and patch PR statuses (no changes)
+update-check: ## Check for new releases and patch PR statuses (no changes)
 	@MY_HERMES_REPO=$(HERMES_DIR) bash $(UPDATE_SCRIPTS)/hermes-update.sh --check
 
-install: ## Bootstrap my-hermes on a new machine (symlinks, cron)
+install-my-hermes: ## Bootstrap my-hermes on a new machine (symlinks, cron)
 	@bash $(GIT_SYNC_SCRIPTS)/setup-my-hermes.sh $(HERMES_DIR)
 
 dashboard: ## Start Hermes dashboard on default port 9119 (checks for conflicts first)

@@ -39,7 +39,7 @@ The `make` targets work from anywhere because `setup-my-hermes.sh` creates a sym
 make git-sync        # sync skills, commit, push
 make git-sync-dry    # preview changes without committing
 make skills-sync     # sync skills only, no commit — inspect in IDE
-make install         # re-bootstrap symlinks on a new machine
+make install-my-hermes  # re-bootstrap symlinks on a new machine
 make dashboard       # start Hermes dashboard on port 9119
 ```
 
