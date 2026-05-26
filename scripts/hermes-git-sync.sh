@@ -2,8 +2,9 @@
 # hermes-git-sync.sh — sync my-skills and commit changes in ~/my-hermes (or your repo)
 # Usage:
 #   hermes-git-sync.sh             — sync skills + commit + push
-#   hermes-git-sync.sh --dry-run   — sync skills + show diff, no commit
-#   hermes-git-sync.sh --sync-only — sync skills only, no git at all
+#   hermes-git-sync.sh --dry-run    — sync skills + show diff, no commit
+#   hermes-git-sync.sh --commit-only — sync skills + commit locally, no push
+#   hermes-git-sync.sh --sync-only   — sync skills only, no git at all
 #
 # Env: MY_HERMES_REPO (default: ~/my-hermes)
 set -euo pipefail
@@ -31,7 +32,7 @@ if [ "$ARG" = "--sync-only" ]; then
 fi
 
 # ── Safety check ─────────────────────────────────────────────────────────────
-if git diff -- memories/ config.yaml | grep -qE '^\+[^+].*(secret|password|api_key)'; then
+if git diff -- memories/ config.yaml | grep -qE '^\+[^+].*(secret|api_key|password\s*[:=]\s*\S{6,})'; then
     echo "⛔ Possible secrets detected — aborting." >&2
     exit 1
 fi
@@ -54,12 +55,10 @@ if [ "$ARG" = "--dry-run" ]; then
     exit 0
 fi
 
-# ── Commit and push ──────────────────────────────────────────────────────────
+# ── Commit, optionally push ──────────────────────────────────────────────────
 git commit -m "chore: sync $(date +%Y-%m-%d\ %H:%M)"
-git push
 
 HASH=$(git rev-parse --short HEAD)
-echo "✓ Synced: $HASH"
 
 # ── Write diff (optional integration point for morning-brief etc.) ────────────
 git diff HEAD~1 --stat > "$DIFF_FILE"
@@ -70,3 +69,12 @@ git diff HEAD~1 -- \
     >> "$DIFF_FILE"
 
 echo "✓ Diff written to $DIFF_FILE"
+
+if [ "$ARG" = "--commit-only" ]; then
+    echo "✓ Committed locally: $HASH"
+    echo "Push skipped (--commit-only). Run git push after approval."
+    exit 0
+fi
+
+git push
+echo "✓ Synced: $HASH"
