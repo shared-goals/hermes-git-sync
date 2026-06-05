@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # hermes-git-sync.sh — sync my-hermes snapshots and commit changes in ~/my-hermes (or your repo)
 # Usage:
-#   hermes-git-sync.sh               — sync skills/scripts + commit + push
-#   hermes-git-sync.sh --dry-run     — sync skills/scripts + show diff, no commit
-#   hermes-git-sync.sh --commit-only — sync skills/scripts + commit locally, no push
+#   hermes-git-sync.sh               — sync skills/scripts + commit
 #   hermes-git-sync.sh --sync-only   — sync skills/scripts only, no git at all
 #
 # Env: MY_HERMES_REPO (default: ~/my-hermes)
@@ -45,17 +43,7 @@ if git diff --cached --quiet; then
     exit 0
 fi
 
-# ── Dry run: show what would be committed ─────────────────────────────────────
-if [ "$ARG" = "--dry-run" ]; then
-    echo "── Staged changes (dry run) ──────────────────────────────────────────"
-    git diff --cached --stat
-    echo "──────────────────────────────────────────────────────────────────────"
-    echo "No commit made. Run without --dry-run to commit and push."
-    git reset HEAD -- . >/dev/null
-    exit 0
-fi
-
-# ── Commit, optionally push ──────────────────────────────────────────────────
+# ── Commit ───────────────────────────────────────────────────────────────────
 git commit -m "chore: sync $(date +%Y-%m-%d\ %H:%M)"
 
 HASH=$(git rev-parse --short HEAD)
@@ -70,11 +58,4 @@ git diff HEAD~1 -- \
 
 echo "✓ Diff written to $DIFF_FILE"
 
-if [ "$ARG" = "--commit-only" ]; then
-    echo "✓ Committed locally: $HASH"
-    echo "Push skipped (--commit-only). Run git push after approval."
-    exit 0
-fi
-
-git push
 echo "✓ Synced: $HASH"
