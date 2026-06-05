@@ -45,9 +45,7 @@ Copy `templates/Makefile` into your repo for convenient shortcuts.
 
 ```bash
 make git-sync         # sync skills/scripts + commit + push
-make git-sync-commit  # sync skills/scripts + commit locally, no push — for Daily Compass / approval workflows
-make git-sync-dry     # preview changes without committing
-make skills-sync      # sync my-skills + scripts snapshots only, no commit — inspect changes in IDE
+make sync             # sync my-skills + scripts snapshots only, no commit — inspect changes in IDE
 ```
 
 `--sync-only` skips git entirely — useful for inspecting skill/script changes without staging anything:
@@ -152,7 +150,7 @@ Never `sudo cp` into serpo's directories or commit as serpo. Shag pushes as shag
 
 - **Secret detector false positives** — the regex `password` without value check triggers on mentions like `restic-password` in memory notes. Fixed regex: `password\s*[:=]\s*\S{6,}` — only flags `password = actualvalue`, not bare word mentions.
 - **`skills-sync` target uses `--sync-only` flag** — exact command: `@MY_HERMES_REPO=$(HERMES_DIR) bash $(GIT_SYNC_SCRIPTS)/hermes-git-sync.sh --sync-only`. Do NOT change it to `skills-only` or any other argument. The flag controls no-commit mode. Breaking this makes `make skills-sync` commit silently.
-- **Always show `git diff --stat` and wait for explicit confirmation before committing** — never commit silently. This applies to ALL paths: running the sync script, direct `git commit` via terminal, Makefile targets, or any other mechanism. There is no exception for "small" changes. `make git-sync-dry` exists specifically to create a technical barrier — use it before `make git-sync`. This rule was violated multiple times in one session; the `--dry-run` flag was added as a structural fix.
+- **Always show `git diff --stat` and wait for explicit confirmation before committing** — never commit silently. This applies to ALL paths: running the sync script, direct `git commit` via terminal, Makefile targets, or any other mechanism. There is no exception for "small" changes.
 - **Never commit secrets** — script checks for sensitive patterns in `memories/` and `config.yaml`.
 - **Cron prompt minimalism** — cron job prompts should be one-line directives ("Run skill X for Y"), not full algorithms. All execution logic lives in the skill's SKILL.md, loaded via the `skills` array. The prompt's only job is to tell the agent *what* to do, not *how*. A 6000-char cron prompt duplicating SKILL.md content is a maintenance liability — update the skill, and the cron job follows automatically. Exception: only add prompt detail for cron-specific concerns (pre-flight steps, delivery format) that don't belong in the skill itself.
 

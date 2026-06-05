@@ -158,4 +158,4 @@ fi
 
 echo ""
 echo "✓ Done! my-hermes repo at $REPO"
-echo "  Run 'make git-sync-dry' to preview, 'make git-sync' to commit and push."
+echo "  Run 'make sync' to preview snapshots, 'make git-sync' to commit and push."
