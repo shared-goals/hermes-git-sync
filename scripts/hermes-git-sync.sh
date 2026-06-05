@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# hermes-git-sync.sh — sync my-skills and commit changes in ~/my-hermes (or your repo)
+# hermes-git-sync.sh — sync my-hermes snapshots and commit changes in ~/my-hermes (or your repo)
 # Usage:
-#   hermes-git-sync.sh             — sync skills + commit + push
-#   hermes-git-sync.sh --dry-run    — sync skills + show diff, no commit
-#   hermes-git-sync.sh --commit-only — sync skills + commit locally, no push
-#   hermes-git-sync.sh --sync-only   — sync skills only, no git at all
+#   hermes-git-sync.sh               — sync skills/scripts + commit + push
+#   hermes-git-sync.sh --dry-run     — sync skills/scripts + show diff, no commit
+#   hermes-git-sync.sh --commit-only — sync skills/scripts + commit locally, no push
+#   hermes-git-sync.sh --sync-only   — sync skills/scripts only, no git at all
 #
 # Env: MY_HERMES_REPO (default: ~/my-hermes)
 set -euo pipefail
@@ -22,12 +22,12 @@ fi
 
 cd "$REPO"
 
-# ── Sync my-skills (user-modified and user-created skills) ───────────────────
-echo "→ Syncing my-skills..."
-"$HERMES_PYTHON" "$SCRIPT_DIR/sync-my-skills.py"
+# ── Sync my-hermes snapshots (skills + scripts) ─────────────────────────────
+echo "→ Syncing my-hermes snapshots..."
+"$HERMES_PYTHON" "$SCRIPT_DIR/sync-my-hermes.py"
 
 if [ "$ARG" = "--sync-only" ]; then
-    echo "✓ Skills synced (no commit)."
+    echo "✓ Skills/scripts synced (no commit)."
     exit 0
 fi
 
@@ -65,7 +65,7 @@ git diff HEAD~1 --stat > "$DIFF_FILE"
 echo "" >> "$DIFF_FILE"
 git diff HEAD~1 -- \
     SOUL.md config.yaml Makefile \
-    memories/ my-skills/ patches/ \
+    memories/ my-skills/ scripts/ patches/ \
     >> "$DIFF_FILE"
 
 echo "✓ Diff written to $DIFF_FILE"

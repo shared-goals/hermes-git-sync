@@ -1,4 +1,4 @@
-.PHONY: help git-sync git-sync-commit git-sync-dry skills-sync patch install-my-hermes update update-check dashboard
+.PHONY: help git-sync sync patch install-my-hermes update update-check dashboard
 
 SHELL := /bin/bash
 
@@ -11,17 +11,11 @@ UPDATE_SCRIPTS    := $(HOME)/.hermes/skills/devops/hermes-update-workflow/script
 help: ## Show this help
 	@awk 'BEGIN {FS=":.*##"; printf "\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  make %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-git-sync: ## Sync Hermes config, memories and skills to git, then push
+git-sync: ## Sync Hermes config, memories, skills and scripts to git, then push
 	@MY_HERMES_REPO=$(HERMES_DIR) bash $(GIT_SYNC_SCRIPTS)/hermes-git-sync.sh
 
-git-sync-commit: ## Sync Hermes config, memories and skills; commit locally, no push
-	@MY_HERMES_REPO=$(HERMES_DIR) bash $(GIT_SYNC_SCRIPTS)/hermes-git-sync.sh --commit-only
-
-skills-sync: ## Sync my-skills snapshot only (no commit) — use to see changes in IDE
+sync: ## Sync my-skills + scripts snapshots only (no commit) — use to see changes in IDE
 	@MY_HERMES_REPO=$(HERMES_DIR) bash $(GIT_SYNC_SCRIPTS)/hermes-git-sync.sh --sync-only
-
-git-sync-dry: ## Show what would be committed (no commit)
-	@MY_HERMES_REPO=$(HERMES_DIR) bash $(GIT_SYNC_SCRIPTS)/hermes-git-sync.sh --dry-run
 
 patch: ## Re-apply patches after hermes update
 	@MY_HERMES_REPO=$(HERMES_DIR) bash $(UPDATE_SCRIPTS)/apply-patches.sh

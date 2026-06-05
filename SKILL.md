@@ -1,6 +1,6 @@
 ---
 name: hermes-git-sync
-description: Version-control Hermes config, memories, and skills in a personal git repo. Also provides `skills-list.py` — a richer skills listing with ●/◑/○ status (custom / patched-builtin / builtin). Load this skill when the user asks to list skills, sync hermes, or check what's been customized.
+description: Version-control Hermes config, memories, skills, and scripts in a personal git repo. Also provides `skills-list.py` — a richer skills listing with ●/◑/○ status (custom / patched-builtin / builtin). Load this skill when the user asks to list skills, sync hermes, or check what's been customized.
 triggers:
   - "skills list"
   - "list skills"
@@ -21,12 +21,12 @@ triggers:
 
 A pattern for versioning your Hermes Agent personalisation in a separate git repo.
 
-**What gets versioned:** `config.yaml`, `SOUL.md`, `memories/`, your skills, local patches.  
-**What stays out:** bundled skills, `.env`, `auth.json` — anything Hermes manages directly.
+**What gets versioned:** `config.yaml`, `SOUL.md`, `memories/`, your skills, `.hermes/scripts`, local patches.
+**What stays out:** bundled skills, `auth.json`, `cron/jobs.json` (too frequently updated — symlinked but gitignored), `cron/output/`, `cron/*.lock` — runtime state Hermes manages directly.
 
 See `references/repo-structure.md` for the full pattern explanation.
 
-## Setup (first time)
+## Setup
 
 ```bash
 bash ~/.hermes/skills/devops/hermes-git-sync/scripts/setup-my-hermes.sh ~/my-hermes
@@ -35,7 +35,7 @@ git remote add origin <your-repo-url>
 git push -u origin main
 ```
 
-`setup-my-hermes.sh` creates the repo structure, symlinks `~/.hermes/` files, registers a daily cron.
+`setup-my-hermes.sh` is **idempotent** — safe to run multiple times. It reconciles the current state: creates missing directories, fixes symlinks, copies files, updates `.gitignore`. On re-run it reports what's already correct.
 
 Copy `templates/Makefile` into your repo for convenient shortcuts.
 
@@ -44,13 +44,13 @@ Copy `templates/Makefile` into your repo for convenient shortcuts.
 ## Usage
 
 ```bash
-make git-sync         # sync skills + commit + push
-make git-sync-commit  # sync skills + commit locally, no push — for Daily Compass / approval workflows
+make git-sync         # sync skills/scripts + commit + push
+make git-sync-commit  # sync skills/scripts + commit locally, no push — for Daily Compass / approval workflows
 make git-sync-dry     # preview changes without committing
-make skills-sync      # sync my-skills snapshot only, no commit — inspect changes in IDE
+make skills-sync      # sync my-skills + scripts snapshots only, no commit — inspect changes in IDE
 ```
 
-`--sync-only` skips git entirely — useful for inspecting skill changes without staging anything:
+`--sync-only` skips git entirely — useful for inspecting skill/script changes without staging anything:
 
 ```bash
 MY_HERMES_REPO=~/my-hermes bash ~/.hermes/skills/devops/hermes-git-sync/scripts/hermes-git-sync.sh --sync-only
@@ -74,6 +74,12 @@ Guidelines:
 - If the command only reads state and is safe, run it once to catch quoting/runtime errors before reporting success.
 - Show `git diff -- Makefile`; do not commit until Сергей explicitly approves.
 
+## Path conventions
+
+- **`~/Work/`** — repos where Шаг collaborates (e.g. `~/Work/prd/`). Not in `~/my-hermes/` (that's the personal config repo). Not in serpo-owned dirs (ownership issues).
+- **Relative paths in skills** — a skill should reference its own files with relative paths (`references/foo.md`, `templates/bar.yaml`), not absolute (`~/.hermes/skills/<cat>/<skill>/references/foo.md`). Cross-skill references (e.g. sg-daily-compass reading shared-goals areas) must be absolute since they're in different directories.
+- **`~/my-hermes/cron/jobs.json`** — the original lives here (git-controlled). Symlinked from `~/.hermes/cron/jobs.json`. Do NOT symlink the entire `cron/` directory — Hermes writes runtime files there (`.tick.lock`, `output/`).
+
 ## Skill storage architecture
 
 ```
@@ -89,7 +95,7 @@ Guidelines:
   └── ...
 ```
 
-`sync-my-skills.py` reads `.bundled_manifest` (MD5 hashes) to detect modifications.  
+`sync-my-hermes.py` syncs both snapshots. Skills still use `.bundled_manifest` (MD5 hashes) to detect modifications.  
 No `external_dirs` needed — custom skills live directly in `~/.hermes/skills/`.
 
 ## Community skill
@@ -148,6 +154,32 @@ Never `sudo cp` into serpo's directories or commit as serpo. Shag pushes as shag
 - **`skills-sync` target uses `--sync-only` flag** — exact command: `@MY_HERMES_REPO=$(HERMES_DIR) bash $(GIT_SYNC_SCRIPTS)/hermes-git-sync.sh --sync-only`. Do NOT change it to `skills-only` or any other argument. The flag controls no-commit mode. Breaking this makes `make skills-sync` commit silently.
 - **Always show `git diff --stat` and wait for explicit confirmation before committing** — never commit silently. This applies to ALL paths: running the sync script, direct `git commit` via terminal, Makefile targets, or any other mechanism. There is no exception for "small" changes. `make git-sync-dry` exists specifically to create a technical barrier — use it before `make git-sync`. This rule was violated multiple times in one session; the `--dry-run` flag was added as a structural fix.
 - **Never commit secrets** — script checks for sensitive patterns in `memories/` and `config.yaml`.
+- **Cron prompt minimalism** — cron job prompts should be one-line directives ("Run skill X for Y"), not full algorithms. All execution logic lives in the skill's SKILL.md, loaded via the `skills` array. The prompt's only job is to tell the agent *what* to do, not *how*. A 6000-char cron prompt duplicating SKILL.md content is a maintenance liability — update the skill, and the cron job follows automatically. Exception: only add prompt detail for cron-specific concerns (pre-flight steps, delivery format) that don't belong in the skill itself.
+
+## Cron job design — minimal prompts, logic in skills
+
+Cron job prompts should be **one line directing to the skill**. All algorithm, pitfalls, and workflow logic lives in the SKILL.md, not in the prompt. The `skills` array loads skills automatically; the prompt is just the task instruction.
+
+```json
+"prompt": "Run the Daily Compass for Sergey.",
+"skills": ["sg-daily-compass", "shared-goals", "hermes-git-sync"]
+```
+
+**Why:** Long prompts with embedded algorithm steps become stale when SKILL.md evolves. The agent reads loaded skills as context — the prompt just tells it what to do.
+
+**Pitfall:** If `model` and `provider` are set in jobs.json, they override global config. After restoring from backup, clear these to `null` so the job inherits from `~/.hermes/config.yaml`.
+
+## Cron/jobs.json — symlink pattern
+
+`jobs.json` changes frequently (Hermes updates it on every cronjob call). Keep it in `~/my-hermes/cron/` with a symlink, but **gitignore it** — too much noise in git status:
+
+```bash
+mkdir -p ~/my-hermes/cron
+cp ~/.hermes/cron/jobs.json ~/my-hermes/cron/jobs.json
+rm ~/.hermes/cron/jobs.json
+ln -s ~/my-hermes/cron/jobs.json ~/.hermes/cron/jobs.json
+echo "cron/jobs.json" >> ~/my-hermes/.gitignore
+```
 
 ## Script ownership principle
 
@@ -187,7 +219,7 @@ if git diff -- memories/ config.yaml | grep -qE '^\+[^+].*(secret|password|api_k
 
 
 
-- **`hermes skills reset` removes from manifest** — `hermes skills reset <name>` clears the manifest entry, so `sync-my-skills.py` treats the skill as user-created (no `bundled.diff`, always copied). Fix: after reverting a skill to bundled state, re-add its hash manually:
+- **`hermes skills reset` removes from manifest** — `hermes skills reset <name>` clears the manifest entry, so `sync-my-hermes.py` treats the skill as user-created (no `bundled.diff`, always copied). Fix: after reverting a skill to bundled state, re-add its hash manually:
   ```python
   import hashlib
   from pathlib import Path
@@ -218,4 +250,5 @@ if git diff -- memories/ config.yaml | grep -qE '^\+[^+].*(secret|password|api_k
   git status   # should show modified files
   ```
   After this, the skill directory behaves as a normal git repo — `git diff`, `git push`, etc. work directly.
+- **Model vs execution split** — when a domain has both a data model and a workflow (e.g. shared-goals has area definitions AND the Daily Compass algorithm), separate them into different skills. The model skill (shared-goals) stays publishable; the execution skill (sg-daily-compass) carries prompts, pitfalls, and operational details. Prompts for the workflow live in the execution skill's `references/prompts.yaml`, not in the model's area yamls.
 - **grep false positive in secrets check** — scope grep to data files: `git diff -- memories/ config.yaml | grep -qE '^\+[^+].*(secret|password|api_key)'`.

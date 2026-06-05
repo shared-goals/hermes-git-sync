@@ -28,7 +28,7 @@ hashes content will produce wrong results and mark all skills as modified.
 | In manifest, absent from user dir | DELETED BY USER — respect, don't re-add |
 | In manifest, gone from bundled | REMOVED upstream — clean from manifest |
 
-## sync-my-skills.py strategy
+## sync-my-hermes.py strategy
 
 Reads manifest → for each skill in `~/.hermes/skills/`:
 - if `name in manifest` and `dir_hash(user_copy) != manifest[name]` → **user-modified** → copy to my-skills/
