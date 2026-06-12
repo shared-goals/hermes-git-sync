@@ -54,6 +54,14 @@ make sync             # sync my-skills + scripts snapshots only, no commit — i
 MY_HERMES_REPO=~/my-hermes bash ~/.hermes/skills/devops/hermes-git-sync/scripts/hermes-git-sync.sh --sync-only
 ```
 
+If a skill disappears from the bundled set after an update (but is still
+listed in `.bundled_manifest`), `make sync` prompts to either:
+
+- convert it to user custom (keep and mirror)
+- remove it from `~/.hermes/skills`
+
+Use `HERMES_ORPHAN_SKILL_POLICY=keep` or `=remove` to run non-interactively.
+
 The script writes `/tmp/last-commit-full-diff.txt` after each commit — useful as input
 for other routines (morning-brief, summary crons, etc.).
 

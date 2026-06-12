@@ -11,6 +11,7 @@ import hashlib
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 SKILLS_DIR = Path.home() / ".hermes/skills"
@@ -50,11 +51,43 @@ def read_manifest():
     return result
 
 
-def find_bundled_skill_path(name: str):
+def write_manifest(manifest):
+    lines = [f"{name}: {manifest[name]}" for name in sorted(manifest)]
+    MANIFEST.write_text("\n".join(lines) + ("\n" if lines else ""))
+
+
+def find_bundled_skill_path(name: str, rel: Path):
+    # Prefer exact category/path match first.
+    candidate = BUNDLED_SKILLS_DIR / rel
+    if (candidate / "SKILL.md").exists():
+        return candidate
+
+    # Fall back to leaf-name lookup for legacy moved skills.
     for p in BUNDLED_SKILLS_DIR.rglob("SKILL.md"):
         if p.parent.name == name:
             return p.parent
     return None
+
+
+def resolve_orphan_policy():
+    policy = os.environ.get("HERMES_ORPHAN_SKILL_POLICY", "ask").strip().lower()
+    if policy not in {"ask", "keep", "remove"}:
+        policy = "ask"
+    if policy == "ask" and not (sys.stdin.isatty() and sys.stdout.isatty()):
+        policy = "keep"
+    return policy
+
+
+def choose_orphan_action(rel: Path, name: str, policy: str):
+    if policy in {"keep", "remove"}:
+        return policy
+
+    prompt = (
+        f"Skill disappeared from bundled set: {rel} ({name}). "
+        "[k]eep as custom / [r]emove from ~/.hermes/skills? [k/r, default:k]: "
+    )
+    answer = input(prompt).strip().lower()
+    return "remove" if answer in {"r", "remove"} else "keep"
 
 
 def write_skill_diff(dest: Path, bundled_path: Path):
@@ -73,6 +106,9 @@ def write_skill_diff(dest: Path, bundled_path: Path):
 
 def sync_skills():
     manifest = read_manifest()
+    orphan_policy = resolve_orphan_policy()
+    manifest_changed = False
+    orphan_kept, orphan_removed = [], []
     MY_SKILLS_DIR.mkdir(parents=True, exist_ok=True)
 
     # rel_path -> (skill_dir, name, is_modified_bundled)
@@ -84,11 +120,37 @@ def sync_skills():
         name = skill_dir.name
         if any(p.startswith(".") for p in rel.parts):
             continue
+        bundled_path = find_bundled_skill_path(name, rel)
+
+        # Skill was bundled previously (manifest entry) but no longer exists in
+        # bundled set. Ask whether to keep as custom or remove.
+        if name in manifest and bundled_path is None:
+            action = choose_orphan_action(rel, name, orphan_policy)
+            if action == "remove":
+                shutil.rmtree(skill_dir)
+                manifest.pop(name, None)
+                manifest_changed = True
+                orphan_removed.append(str(rel))
+                continue
+
+            # keep as custom -> remove bundled marker from manifest
+            manifest.pop(name, None)
+            manifest_changed = True
+            orphan_kept.append(str(rel))
+            want[rel] = (skill_dir, name, False)
+            continue
+
         if name in manifest:
             if dir_hash(skill_dir) != manifest[name]:
                 want[rel] = (skill_dir, name, True)
-        else:
-            want[rel] = (skill_dir, name, False)
+            continue
+
+        # Skill not in manifest: if it now exists in bundled roots and
+        # content matches, treat it as bundled and do not mirror into my-skills.
+        if bundled_path and dir_hash(skill_dir) == dir_hash(bundled_path):
+            continue
+
+        want[rel] = (skill_dir, name, False)
 
     copied, updated, removed = [], [], []
 
@@ -106,7 +168,7 @@ def sync_skills():
             shutil.copytree(src, dest)
 
         if is_modified:
-            bundled_path = find_bundled_skill_path(name)
+            bundled_path = find_bundled_skill_path(name, rel)
             if bundled_path:
                 write_skill_diff(dest, bundled_path)
 
@@ -130,12 +192,19 @@ def sync_skills():
         print(f"  ↑ {len(updated)} skills updated: {', '.join(sorted(updated))}")
     if removed:
         print(f"  − {len(removed)} skills removed: {', '.join(sorted(removed))}")
+    if orphan_kept:
+        print(f"  ↻ {len(orphan_kept)} orphaned skills converted to custom: {', '.join(sorted(orphan_kept))}")
+    if orphan_removed:
+        print(f"  ⊘ {len(orphan_removed)} orphaned skills removed from ~/.hermes/skills: {', '.join(sorted(orphan_removed))}")
     if not copied and not updated and not removed:
         print("  ✓ my-skills up to date")
     print(
         f"  = {len(want)} skills tracked "
         f"({n_modified} modified bundled, {n_created} user-created)"
     )
+
+    if manifest_changed:
+        write_manifest(manifest)
 
 
 def build_scripts_diff(modified_pairs):

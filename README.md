@@ -53,6 +53,12 @@ make patch           # re-apply patches only
 
 Set `MY_HERMES_REPO` env var if your repo lives somewhere other than `~/my-hermes`.
 
+If a skill was previously bundled (tracked in `.bundled_manifest`) but
+disappears from the bundled set after an update, `make sync` asks whether to:
+
+- keep it as custom (it is converted to user-created and mirrored)
+- remove it from `~/.hermes/skills`
+
 ## Example repo structure
 
 ```
