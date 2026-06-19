@@ -62,6 +62,7 @@ symlink() {
 symlink "$REPO/config.yaml"          "$HERMES/config.yaml"
 symlink "$REPO/SOUL.md"              "$HERMES/SOUL.md"
 symlink "$REPO/.env"                 "$HERMES/.env"
+symlink "$REPO/webhook_subscriptions.json" "$HERMES/webhook_subscriptions.json"
 
 # Memory files
 symlink "$REPO/memories/MEMORY.md"   "$HERMES/memories/MEMORY.md"
@@ -97,6 +98,7 @@ copy_if_missing() {
 copy_if_missing "$HERMES/config.yaml"        "$REPO/config.yaml"
 copy_if_missing "$HERMES/SOUL.md"            "$REPO/SOUL.md"
 copy_if_missing "$HERMES/.env"               "$REPO/.env"
+copy_if_missing "$HERMES/webhook_subscriptions.json" "$REPO/webhook_subscriptions.json"
 copy_if_missing "$HERMES/memories/MEMORY.md" "$REPO/memories/MEMORY.md"
 copy_if_missing "$HERMES/memories/USER.md"   "$REPO/memories/USER.md"
 copy_if_missing "$HERMES/cron/jobs.json"     "$REPO/cron/jobs.json"
@@ -120,6 +122,7 @@ REQUIRED_LINES=(
     "hermes-agent/"
     ".DS_Store"
     "cron/jobs.json"
+    "webhook_subscriptions.json"
 )
 
 touch "$GITIGNORE"
