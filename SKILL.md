@@ -126,8 +126,7 @@ When reorganizing skills between categories, use `mv` in terminal (Hermes picks 
 
 Good category structure (our convention):
 - `shared-goals/` — Sergey's personal life areas (health, finance, music, photo, weather, etc.)
-- `homelab/` — infrastructure (backup, NAS, uptime monitoring, photo pipeline)
-- `devops/` — Hermes tooling and workflow (git-sync, update, kanban)
+- `devops/` — infrastructure (backup, NAS, uptime monitoring, photo pipeline), Hermes tooling and workflow (git-sync, update, kanban)
 - `note-taking/` — Obsidian, voice memos
 - `media/` — media tools (movie-recommend, spotify, etc.)
 
