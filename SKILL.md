@@ -69,6 +69,16 @@ for other routines (morning-brief, summary crons, etc.).
 
 Sergey's `~/my-hermes/Makefile` is the preferred home for repeatable local operational commands that are useful across sessions. It is tracked by `hermes-git-sync`, so add small stable targets there rather than leaving long one-off commands in chat history.
 
+Current targets with operational relevance:
+
+| Target | Description |
+|--------|-------------|
+| `make ui` | Launch Hermes web dashboard on port 9119 (checks conflicts first, binds `0.0.0.0`) |
+| `make git-sync` | Full sync + commit skills/scripts/config to git |
+| `make sync` | Snapshot-only sync (no commit) — inspect in IDE |
+| `make update` | Check and apply Hermes updates |
+| `make hindsight-status` / `hstat` | Check Hindsight health on rock |
+
 Guidelines:
 - Keep commands DRY by using existing host aliases and config (`ssh rock`, not `ssh -i ~/.ssh/id_key shag@rock`).
 - Use short primary targets plus readable aliases when helpful (`hstat` + `hindsight-status`).
@@ -79,6 +89,66 @@ Guidelines:
   ```
 - If the command only reads state and is safe, run it once to catch quoting/runtime errors before reporting success.
 - Show `git diff -- Makefile`; do not commit until Сергей explicitly approves.
+
+## Dashboard ↔ Nous Portal wiring
+
+The Hermes web dashboard (`hermes dashboard`) can use Nous Portal for OAuth authentication.
+
+### Registration workflow
+
+```bash
+# 1. Confirm Portal is logged in and Tool Gateway is active
+hermes portal info
+
+# 2. Register dashboard as an OAuth client with Portal
+hermes dashboard register --name "<label>"
+
+# 3. Restart dashboard to pick up new .env
+hermes dashboard --stop
+hermes dashboard --no-open
+```
+
+### OAuth client ID: source of truth
+
+The registered client ID goes into **`~/.hermes/.env`** (`HERMES_DASHBOARD_OAUTH_CLIENT_ID=agent:...`), **not** `config.yaml`. The `config.yaml` `dashboard.oauth.client_id` section should be replaced with a comment:
+
+```yaml
+dashboard:
+  theme: default
+  show_token_analytics: false
+  # oauth — managed via HERMES_DASHBOARD_OAUTH_CLIENT_ID in .env
+```
+
+`.env` survives updates and overrides `config.yaml` for this key. If both exist, the env var wins.
+
+### Auth behaviour
+
+| Bind | Auth required | Use case |
+|------|--------------|----------|
+| `127.0.0.1` (default) | No | Local-only, your machine |
+| `0.0.0.0` | Yes (Portal login at `/login`) | LAN/public, other devices |
+
+The `--insecure` flag is deprecated/no-op since June 2026 — it no longer disables auth on public binds.
+
+### Managing registered dashboards
+
+List/revoke at `https://portal.nousresearch.com/local-dashboards`. If you have stale registrations (e.g. both `config.yaml` and `.env` had client IDs), remove the orphan from the Portal UI.
+
+### Makefile target
+
+The dashboard is launched via `make ui` (not `make dashboard`). The Makefile target checks for port 9119 conflicts first:
+
+```makefile
+ui: ## Start Hermes dashboard on default port 9119 (checks for conflicts first)
+	@PID=$$(lsof -nP -iTCP:9119 -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $$2}'); \
+	if [ -n "$$PID" ]; then \
+		echo "⚠️  Port 9119 is in use by PID $$PID:"; \
+		ps -p $$PID -o pid,command 2>/dev/null | tail -1; \
+		echo "Kill it first: kill $$PID"; \
+		exit 1; \
+	fi
+	hermes dashboard --host 0.0.0.0 --no-open
+```
 
 ## Path conventions
 
