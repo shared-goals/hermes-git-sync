@@ -13,8 +13,11 @@ DIFF_FILE="/tmp/last-commit-full-diff.txt"
 ARG="${1:-}"
 
 # ── Python: prefer hermes venv, fall back to system python3 ──────────────────
-HERMES_PYTHON="$(dirname "$(dirname "$(realpath "$(which hermes)")")")/venv/bin/python3"
-if [ ! -x "$HERMES_PYTHON" ]; then
+HERMES_BIN="$(command -v hermes 2>/dev/null || true)"
+if [ -n "$HERMES_BIN" ]; then
+    HERMES_PYTHON="$(dirname "$(dirname "$(realpath "$HERMES_BIN")")")/venv/bin/python3"
+fi
+if [ ! -x "${HERMES_PYTHON:-}" ]; then
     HERMES_PYTHON="python3"
 fi
 

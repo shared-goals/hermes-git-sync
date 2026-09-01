@@ -22,7 +22,7 @@ triggers:
 A pattern for versioning your Hermes Agent personalisation in a separate git repo.
 
 **What gets versioned:** `config.yaml`, `SOUL.md`, `memories/`, your skills, local patches.  
-**What stays out:** bundled skills, `.env`, `auth.json`, `cron/jobs.json` — anything Hermes manages directly or updates frequently at runtime.
+**What stays out:** pristine bundled, retired bundled, and official optional skills, `.env`, `auth.json`, `cron/jobs.json` — anything Hermes manages directly or updates frequently at runtime.
 
 See `references/repo-structure.md` for the full pattern explanation.
 

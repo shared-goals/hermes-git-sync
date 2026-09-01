@@ -8,6 +8,7 @@ Currently syncs:
 """
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -16,12 +17,14 @@ from pathlib import Path
 
 SKILLS_DIR = Path.home() / ".hermes/skills"
 BUNDLED_SKILLS_DIR = Path.home() / ".hermes/hermes-agent/skills"
+OPTIONAL_SKILLS_DIR = Path.home() / ".hermes/hermes-agent/optional-skills"
 SCRIPTS_DIR = Path.home() / ".hermes/scripts"
 BUNDLED_SCRIPTS_DIR = Path.home() / ".hermes/hermes-agent/scripts"
 MY_HERMES_REPO = Path(os.environ.get("MY_HERMES_REPO", str(Path.home() / "my-hermes")))
 MY_SKILLS_DIR = MY_HERMES_REPO / "my-skills"
 MY_SCRIPTS_DIR = MY_HERMES_REPO / "scripts"
 MANIFEST = SKILLS_DIR / ".bundled_manifest"
+HUB_LOCK_FILE = SKILLS_DIR / ".hub/lock.json"
 
 
 def dir_hash(path: Path) -> str:
@@ -37,6 +40,20 @@ def dir_hash(path: Path) -> str:
 
 def file_hash(path: Path) -> str:
     return hashlib.md5(path.read_bytes()).hexdigest()
+
+
+def content_hash(path: Path) -> str:
+    """Return the canonical content hash used by Hermes hub lock entries."""
+    hasher = hashlib.sha256()
+    for fpath in sorted(
+        (item.relative_to(path).as_posix(), item)
+        for item in path.rglob("*")
+        if item.is_file()
+    ):
+        rel, file_path = fpath
+        hasher.update(rel.encode("utf-8") + b"\0")
+        hasher.update(file_path.read_bytes())
+    return f"sha256:{hasher.hexdigest()[:16]}"
 
 
 def read_manifest():
@@ -67,6 +84,98 @@ def find_bundled_skill_path(name: str, rel: Path):
         if p.parent.name == name:
             return p.parent
     return None
+
+
+def read_official_optional_skills():
+    """Return installed official optional paths mapped to their hub hashes."""
+    if not HUB_LOCK_FILE.exists():
+        return {}
+    try:
+        installed = json.loads(HUB_LOCK_FILE.read_text()).get("installed", {})
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+    return {
+        entry["install_path"]: entry.get("content_hash", "")
+        for entry in installed.values()
+        if isinstance(entry, dict)
+        and entry.get("source") == "official"
+        and entry.get("install_path")
+    }
+
+
+def find_optional_skill_path(name: str, rel: Path):
+    candidate = OPTIONAL_SKILLS_DIR / rel
+    if (candidate / "SKILL.md").exists():
+        return candidate
+
+    for path in OPTIONAL_SKILLS_DIR.rglob("SKILL.md"):
+        if path.parent.name == name:
+            return path.parent
+    return None
+
+
+def is_unchanged_official_optional(skill_dir: Path, name: str, rel: Path, official_optional):
+    lock_hash = official_optional.get(rel.as_posix())
+    if lock_hash and content_hash(skill_dir) == lock_hash:
+        return True
+
+    optional_path = find_optional_skill_path(name, rel)
+    return optional_path is not None and dir_hash(skill_dir) == dir_hash(optional_path)
+
+
+def bundled_history_hashes(rel: Path):
+    """Yield canonical hashes for historical bundled versions of ``rel``."""
+    repo = BUNDLED_SKILLS_DIR.parent
+    skill_path = f"skills/{rel.as_posix()}"
+    try:
+        revisions = subprocess.run(
+            ["git", "-C", str(repo), "rev-list", "--all", "--", skill_path],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+    except (OSError, subprocess.CalledProcessError):
+        return
+
+    for revision in revisions:
+        try:
+            listing = subprocess.run(
+                ["git", "-C", str(repo), "ls-tree", "-r", "-z", revision, "--", skill_path],
+                capture_output=True,
+                check=True,
+            ).stdout
+        except (OSError, subprocess.CalledProcessError):
+            continue
+        if not listing:
+            continue
+
+        hasher = hashlib.sha256()
+        found = False
+        for entry in listing.split(b"\0"):
+            if not entry:
+                continue
+            _metadata, path_bytes = entry.split(b"\t", 1)
+            path = path_bytes.decode("utf-8")
+            rel_path = path.removeprefix(f"{skill_path}/")
+            if rel_path == path:
+                continue
+            contents = subprocess.run(
+                ["git", "-C", str(repo), "show", f"{revision}:{path}"],
+                capture_output=True,
+                check=True,
+            ).stdout
+            hasher.update(rel_path.encode("utf-8") + b"\0")
+            hasher.update(contents)
+            found = True
+        if found:
+            yield f"sha256:{hasher.hexdigest()[:16]}"
+
+
+def is_unchanged_retired_bundled(skill_dir: Path, rel: Path):
+    """Return whether an untracked installed skill exactly matches old stock."""
+    installed_hash = content_hash(skill_dir)
+    return any(installed_hash == history_hash for history_hash in bundled_history_hashes(rel))
 
 
 def resolve_orphan_policy():
@@ -106,6 +215,7 @@ def write_skill_diff(dest: Path, bundled_path: Path):
 
 def sync_skills():
     manifest = read_manifest()
+    official_optional = read_official_optional_skills()
     orphan_policy = resolve_orphan_policy()
     manifest_changed = False
     orphan_kept, orphan_removed = [], []
@@ -121,6 +231,9 @@ def sync_skills():
         if any(p.startswith(".") for p in rel.parts):
             continue
         bundled_path = find_bundled_skill_path(name, rel)
+
+        if is_unchanged_official_optional(skill_dir, name, rel, official_optional):
+            continue
 
         # Skill was bundled previously (manifest entry) but no longer exists in
         # bundled set. Ask whether to keep as custom or remove.
@@ -143,6 +256,9 @@ def sync_skills():
         if name in manifest:
             if dir_hash(skill_dir) != manifest[name]:
                 want[rel] = (skill_dir, name, True)
+            continue
+
+        if is_unchanged_retired_bundled(skill_dir, rel):
             continue
 
         # Skill not in manifest: if it now exists in bundled roots and

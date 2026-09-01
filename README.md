@@ -4,7 +4,8 @@ A [Hermes Agent](https://hermes-agent.nousresearch.com) skill that version-contr
 
 ## What it does
 
-- Mirrors your user-created and user-modified skills to `~/my-hermes/my-skills/`
+- Mirrors user-created and modified skills to `~/my-hermes/my-skills/`
+- Excludes pristine bundled, retired bundled, and official optional skills, using local provenance and bundled history
 - Mirrors your user-created and user-modified scripts from `~/.hermes/scripts/` to `~/my-hermes/scripts/`
 - For modified bundled skills, writes a `bundled.diff` so you can see exactly what you changed vs upstream
 - Commits and pushes daily (integrates with `morning-brief` cron)
